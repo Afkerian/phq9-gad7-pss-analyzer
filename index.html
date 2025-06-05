@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analizador de Cuestionarios de Salud Mental</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8;
+        }
+        .container {
+            max-width: 1300px; 
+            margin: 2rem auto;
+            padding: 1.5rem;
+            background-color: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        }
+        h1, h2 {
+            color: #1e3a8a;
+        }
+        .btn {
+            background-color: #2563eb;
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            font-weight: 500;
+            transition: background-color 0.3s ease;
+            cursor: pointer;
+        }
+        .btn:hover {
+            background-color: #1d4ed8;
+        }
+        .btn:disabled {
+            background-color: #9ca3af;
+            cursor: not-allowed;
+        }
+        .file-input-label {
+            border: 2px dashed #93c5fd;
+            padding: 2rem;
+            text-align: center;
+            border-radius: 8px;
+            cursor: pointer;
+            background-color: #eff6ff;
+            transition: background-color 0.3s ease;
+        }
+        .file-input-label:hover {
+            background-color: #dbeafe;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1.5rem;
+        }
+        th, td {
+            border: 1px solid #e5e7eb;
+            padding: 0.75rem;
+            text-align: left;
+            font-size: 0.875rem;
+        }
+        th {
+            background-color: #e0e7ff;
+            color: #1e3a8a;
+            font-weight: 600;
+            vertical-align: top; 
+        }
+        .filter-input, .filter-select {
+            width: 100%;
+            padding: 0.35rem 0.6rem; 
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            margin-top: 0.25rem;
+            box-sizing: border-box;
+        }
+        tbody tr:nth-child(even) {
+            background-color: #f9fafb;
+        }
+        tbody tr:hover {
+            background-color: #f3f4f6;
+        }
+        .results-table-container {
+            max-height: 500px;
+            overflow-y: auto;
+            border-radius: 8px;
+            border: 1px solid #e5e7eb;
+        }
+        .sticky-header th {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            background-color: #e0e7ff;
+        }
+        .warning {
+            color: #b91c1c;
+            font-weight: bold;
+        }
+        .modal { /* Kept for error messages */
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 1rem;
+            box-sizing: border-box;
+        }
+        .modal-content { /* Kept for error messages */
+            background-color: white;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            width: 95%;
+            max-width: 500px; /* Adjusted from 800px as charts are removed */
+            text-align: center;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        .modal-btn { /* Kept for error messages */
+            background-color: #2563eb;
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            margin-top: 1.5rem;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="text-center mb-8">
+            <h1 class="text-3xl font-bold mb-2">Analizador de Cuestionarios de Salud Mental</h1>
+            <p class="text-gray-600">Cargue un archivo CSV para procesar los resultados de PHQ-9, GAD-7 y PSS-14.</p>
+        </header>
+
+        <div class="mb-6">
+            <label for="csvFileInput" class="file-input-label block">
+                <span id="file-name-display" class="text-gray-700">Haz clic aquí para seleccionar tu archivo CSV</span>
+                <input type="file" id="csvFileInput" class="hidden" accept=".csv">
+            </label>
+        </div>
+
+        <div class="text-center mb-6 space-x-2 sm:space-x-4">
+            <button id="processButton" class="btn" disabled>Procesar Archivo</button>
+            <button id="downloadCsvButton" class="btn" disabled>Descargar CSV</button>
+        </div>
+        
+        <div id="loadingIndicator" class="text-center text-blue-600 font-medium my-4 hidden">
+            <div role="status">
+                <svg aria-hidden="true" class="inline w-8 h-8 text-gray-200 animate-spin dark:text-gray-600 fill-blue-600" viewBox="0 0 100 101" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M100 50.5908C100 78.2051 77.6142 100.591 50 100.591C22.3858 100.591 0 78.2051 0 50.5908C0 22.9766 22.3858 0.59082 50 0.59082C77.6142 0.59082 100 22.9766 100 50.5908ZM9.08144 50.5908C9.08144 73.1895 27.4013 91.5094 50 91.5094C72.5987 91.5094 90.9186 73.1895 90.9186 50.5908C90.9186 27.9921 72.5987 9.67226 50 9.67226C27.4013 9.67226 9.08144 27.9921 9.08144 50.5908Z" fill="currentColor"/><path d="M93.9676 39.0409C96.393 38.4038 97.8624 35.9116 97.0079 33.5539C95.2932 28.8227 92.871 24.3692 89.8167 20.348C85.8452 15.1192 80.8826 10.7238 75.2124 7.41289C69.5422 4.10194 63.2754 1.94025 56.7698 1.05124C51.7666 0.367541 46.6976 0.446843 41.7345 1.27873C39.2613 1.69328 37.813 4.19778 38.4501 6.62326C39.0873 9.04874 41.5694 10.4717 44.0505 10.1071C47.8511 9.54855 51.7191 9.52689 55.5402 10.0492C60.8642 10.7766 65.9928 12.5457 70.6331 15.2552C75.2735 17.9648 79.3347 21.5619 82.5849 25.841C84.9175 28.9121 86.7997 32.2913 88.1811 35.8758C89.083 38.2158 91.5421 39.6781 93.9676 39.0409Z" fill="currentFill"/></svg>
+                <span class="ml-2">Procesando datos...</span>
+            </div>
+        </div>
+        
+        <div id="filteredRecordCountDisplay" class="text-center my-4 font-medium text-gray-700"></div>
+
+        <div id="resultsArea" class="hidden">
+            <h2 class="text-2xl font-semibold mb-4">Resultados del Procesamiento</h2>
+            <div class="results-table-container">
+                <table id="resultsTable">
+                    <thead class="sticky-header">
+                        <tr>
+                            <th>Cédula <input type="text" class="filter-input" data-column="0" id="filterCedula" placeholder="Filtrar..."></th>
+                            <th>PHQ-9 Puntuación</th>
+                            <th>PHQ-9 Interpretación <select class="filter-select" data-column="2" id="filterPhq9Int"><option value="">Todas</option></select></th>
+                            <th>GAD-7 Puntuación</th>
+                            <th>GAD-7 Interpretación <select class="filter-select" data-column="4" id="filterGad7Int"><option value="">Todas</option></select></th>
+                            <th>PSS-14 Puntuación</th>
+                            <th>PSS-14 Interpretación <select class="filter-select" data-column="6" id="filterPss14Int"><option value="">Todas</option></select></th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for errors or messages -->
+    <div id="messageModal" class="modal hidden">
+        <div class="modal-content">
+            <p id="modalMessageText"></p>
+            <button id="modalCloseButton" class="modal-btn">Cerrar</button>
+        </div>
+    </div>
+
+    <script>
+        // DOM Elements
+        const csvFileInput = document.getElementById('csvFileInput');
+        const processButton = document.getElementById('processButton');
+        // const showChartsButton = document.getElementById('showChartsButton'); // Removed
+        const downloadCsvButton = document.getElementById('downloadCsvButton');
+        const resultsArea = document.getElementById('resultsArea');
+        const resultsTableBody = document.querySelector('#resultsTable tbody');
+        const fileNameDisplay = document.getElementById('file-name-display');
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        const filteredRecordCountDisplay = document.getElementById('filteredRecordCountDisplay'); // Renamed
+        
+        const messageModal = document.getElementById('messageModal');
+        const modalMessageText = document.getElementById('modalMessageText');
+        const modalCloseButton = document.getElementById('modalCloseButton');
+
+        // Filter elements
+        const filterCedula = document.getElementById('filterCedula');
+        const filterPhq9Int = document.getElementById('filterPhq9Int');
+        const filterGad7Int = document.getElementById('filterGad7Int');
+        const filterPss14Int = document.getElementById('filterPss14Int');
+
+        let processedDataGlobal = []; 
+
+        const scoreMapPHQGAD = {
+            "ningun dia": 0, "no en absoluto": 0, "para nada": 0,
+            "varios dias": 1, "mas de la mitad de los dias": 2, "casi todos los dias": 3
+        };
+        const scoreMapPSS = {
+            "nunca": 0, "casi nunca": 1, "de vez en cuando": 2, "a menudo": 3, "muy a menudo": 4
+        };
+        
+        // Event Listeners
+        csvFileInput.addEventListener('change', function(event) {
+            if (event.target.files.length > 0) {
+                fileNameDisplay.textContent = `Archivo: ${event.target.files[0].name}`;
+                processButton.disabled = false;
+            } else {
+                fileNameDisplay.textContent = 'Haz clic aquí para seleccionar tu archivo CSV';
+                processButton.disabled = true;
+                // showChartsButton.disabled = true; // Removed
+                downloadCsvButton.disabled = true;
+            }
+        });
+        
+        processButton.addEventListener('click', () => {
+            const file = csvFileInput.files[0];
+            if (file) {
+                loadingIndicator.classList.remove('hidden');
+                resultsArea.classList.add('hidden');
+                resultsTableBody.innerHTML = '';
+                filteredRecordCountDisplay.textContent = ''; // Clear previous count
+                // showChartsButton.disabled = true; // Removed
+                downloadCsvButton.disabled = true;
+                resetFilters();
+
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        const csvText = e.target.result;
+                        processedDataGlobal = processCSV(csvText);
+                        populateFilterDropdowns(processedDataGlobal);
+                        displayResults(processedDataGlobal); // This will also call applyTableFilters
+                        resultsArea.classList.remove('hidden');
+                        if (processedDataGlobal.length > 0) {
+                            // showChartsButton.disabled = false; // Removed
+                            downloadCsvButton.disabled = false;
+                        }
+                    } catch (error) {
+                        console.error("Error procesando CSV:", error);
+                        showModal(`Error al procesar el archivo: ${error.message}`);
+                    } finally {
+                        loadingIndicator.classList.add('hidden');
+                    }
+                };
+                reader.onerror = () => {
+                    console.error("Error al leer archivo.");
+                    showModal("Error al leer el archivo.");
+                    loadingIndicator.classList.add('hidden');
+                };
+                reader.readAsText(file, 'ISO-8859-1'); 
+            } else {
+                showModal("Por favor, selecciona un archivo CSV.");
+            }
+        });
+
+        modalCloseButton.addEventListener('click', () => messageModal.classList.add('hidden'));
+        
+        downloadCsvButton.addEventListener('click', () => {
+            if (processedDataGlobal.length > 0) {
+                downloadCSV(processedDataGlobal);
+            } else {
+                showModal("No hay datos procesados para descargar.");
+            }
+        });
+
+        // Add event listeners for filter inputs/selects
+        filterCedula.addEventListener('keyup', applyTableFilters);
+        filterPhq9Int.addEventListener('change', applyTableFilters);
+        filterGad7Int.addEventListener('change', applyTableFilters);
+        filterPss14Int.addEventListener('change', applyTableFilters);
+
+
+        // Utility Functions
+        function showModal(message) {
+            modalMessageText.textContent = message;
+            messageModal.classList.remove('hidden');
+        }
+
+        function normalizeAnswer(answer) {
+            if (typeof answer !== 'string') return "";
+            let processedAnswer = answer.replace(/\u00A0/g, ' '); 
+            processedAnswer = processedAnswer.trim();
+            processedAnswer = processedAnswer.toLowerCase();
+            processedAnswer = processedAnswer.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+            processedAnswer = processedAnswer.replace(/\s+/g, ' ').trim();
+            return processedAnswer;
+        }
+
+        // Calculation Functions
+        function calculatePHQ9(answers) {
+            let score = 0; let warningQ9 = false;
+            answers.forEach((ans, index) => {
+                const questionScore = scoreMapPHQGAD[normalizeAnswer(ans)] || 0;
+                score += questionScore;
+                if (index === 8 && questionScore > 0) warningQ9 = true;
+            });
+            let interpretation = "Depresión grave";
+            if (score <= 4) interpretation = "Depresión mínima o ausente";
+            else if (score <= 9) interpretation = "Depresión leve";
+            else if (score <= 14) interpretation = "Depresión moderada";
+            else if (score <= 19) interpretation = "Depresión moderadamente grave";
+            return { score, phq9_interpretation: interpretation, phq9_warning: warningQ9 };
+        }
+
+        function calculateGAD7(answers) {
+            let score = 0;
+            answers.forEach(ans => { score += scoreMapPHQGAD[normalizeAnswer(ans)] || 0; });
+            let interpretation = "Ansiedad grave";
+            if (score <= 4) interpretation = "Ansiedad mínima";
+            else if (score <= 9) interpretation = "Ansiedad leve";
+            else if (score <= 14) interpretation = "Ansiedad moderada";
+            return { score, gad7_interpretation: interpretation };
+        }
+
+        function calculatePSS14(answers) {
+            let score = 0; const directItemsIndices = [0, 1, 2, 7, 10, 11, 13]; 
+            answers.forEach((ans, index) => {
+                let questionScore = scoreMapPSS[normalizeAnswer(ans)] || 0;
+                if (!directItemsIndices.includes(index)) questionScore = 4 - questionScore;
+                score += questionScore;
+            });
+            let interpretation = "Estrés elevado";
+            if (score <= 19) interpretation = "Estrés bajo";
+            else if (score <= 25) interpretation = "Estrés moderado";
+            return { score, pss14_interpretation: interpretation };
+        }
+
+        // CSV Processing
+        function processCSV(csvText) {
+            const lines = csvText.split(/\r\n|\n/).filter(line => line.trim() !== "");
+            if (lines.length < 2) throw new Error("El archivo CSV está vacío o no tiene datos.");
+            const headers = lines[0].split(';').map(h => h.trim());
+            const data = [];
+            const requiredColumnCount = 43;
+            if (headers.length < requiredColumnCount) {
+                 console.warn(`El archivo CSV tiene ${headers.length} columnas, se esperaban al menos ${requiredColumnCount}.`);
+            }
+            const cedulaIndex = headers.length - 1; 
+            const phq9_indices = Array.from({length: 9}, (_, i) => 10 + i);
+            const gad7_indices = Array.from({length: 7}, (_, i) => 20 + i);
+            const pss14_indices = Array.from({length: 14}, (_, i) => 28 + i);
+
+            for (let i = 1; i < lines.length; i++) {
+                const currentLine = lines[i].split(';');
+                const cedula = (cedulaIndex < currentLine.length && currentLine[cedulaIndex]) ? currentLine[cedulaIndex].trim() : `FILA_${i+1}_SIN_ID`;
+                const getAnswer = (line, index) => (index < line.length && line[index] !== undefined ? line[index] : "");
+                const phq9_answers = phq9_indices.map(idx => getAnswer(currentLine, idx));
+                const gad7_answers = gad7_indices.map(idx => getAnswer(currentLine, idx));
+                const pss14_answers = pss14_indices.map(idx => getAnswer(currentLine, idx));
+                
+                const phq9_result = calculatePHQ9(phq9_answers);
+                const gad7_result = calculateGAD7(gad7_answers);
+                const pss14_result = calculatePSS14(pss14_answers);
+                
+                data.push({
+                    cedula, 
+                    phq9_score: phq9_result.score, 
+                    phq9_interpretation: phq9_result.phq9_interpretation, 
+                    phq9_warning: phq9_result.phq9_warning,
+                    gad7_score: gad7_result.score, 
+                    gad7_interpretation: gad7_result.gad7_interpretation,
+                    pss14_score: pss14_result.score, 
+                    pss14_interpretation: pss14_result.pss14_interpretation
+                });
+            }
+            return data;
+        }
+        
+        function resetFilters() {
+            filterCedula.value = "";
+            filterPhq9Int.innerHTML = '<option value="">Todas</option>';
+            filterGad7Int.innerHTML = '<option value="">Todas</option>';
+            filterPss14Int.innerHTML = '<option value="">Todas</option>';
+        }
+
+        function populateFilterDropdowns(data) {
+            const phq9Interpretations = new Set();
+            const gad7Interpretations = new Set();
+            const pss14Interpretations = new Set();
+
+            data.forEach(row => {
+                phq9Interpretations.add(row.phq9_interpretation);
+                gad7Interpretations.add(row.gad7_interpretation);
+                pss14Interpretations.add(row.pss14_interpretation);
+            });
+
+            const populateSelect = (selectElement, optionsSet) => {
+                // Clear previous options except "Todas"
+                Array.from(selectElement.options).forEach(option => {
+                    if (option.value !== "") option.remove();
+                });
+                optionsSet.forEach(opt => {
+                    const option = document.createElement('option');
+                    option.value = opt;
+                    option.textContent = opt;
+                    selectElement.appendChild(option);
+                });
+            };
+            populateSelect(filterPhq9Int, phq9Interpretations);
+            populateSelect(filterGad7Int, gad7Interpretations);
+            populateSelect(filterPss14Int, pss14Interpretations);
+        }
+
+        // Display Results & Filtering
+        function displayResults(data) {
+            resultsTableBody.innerHTML = ''; 
+            
+            if (data.length === 0) {
+                filteredRecordCountDisplay.textContent = "No se encontraron datos válidos para procesar.";
+                showModal("No se encontraron datos válidos para procesar o el archivo está vacío.");
+                return;
+            }
+            data.forEach(row => {
+                const tr = document.createElement('tr');
+                let phq9Text = row.phq9_interpretation + (row.phq9_warning ? " (¡Atención pregunta 9!)" : "");
+                tr.innerHTML = `
+                    <td>${row.cedula}</td> <td>${row.phq9_score}</td>
+                    <td class="${row.phq9_warning ? 'warning' : ''}">${phq9Text}</td>
+                    <td>${row.gad7_score}</td> <td>${row.gad7_interpretation}</td>
+                    <td>${row.pss14_score}</td> <td>${row.pss14_interpretation}</td>
+                `;
+                resultsTableBody.appendChild(tr);
+            });
+            applyTableFilters(); // This will update the count
+        }
+
+        function applyTableFilters() {
+            const cedulaFilter = filterCedula.value.toLowerCase().trim();
+            const phq9Filter = filterPhq9Int.value;
+            const gad7Filter = filterGad7Int.value;
+            const pss14Filter = filterPss14Int.value;
+            let visibleRowCount = 0;
+
+            Array.from(resultsTableBody.rows).forEach(row => {
+                let display = true;
+                const rowCedula = row.cells[0].textContent.toLowerCase();
+                // Extract interpretation without warning text for accurate filtering
+                const rowPhq9IntFullText = row.cells[2].textContent;
+                const rowPhq9Int = rowPhq9IntFullText.includes(" (¡Atención pregunta 9!)") ? rowPhq9IntFullText.split(" (¡Atención pregunta 9!)")[0] : rowPhq9IntFullText;
+                
+                const rowGad7Int = row.cells[4].textContent;
+                const rowPss14Int = row.cells[6].textContent;
+
+                if (cedulaFilter && !rowCedula.includes(cedulaFilter)) display = false;
+                if (phq9Filter && rowPhq9Int !== phq9Filter) display = false;
+                if (gad7Filter && rowGad7Int !== gad7Filter) display = false;
+                if (pss14Filter && rowPss14Int !== pss14Filter) display = false;
+                
+                row.style.display = display ? "" : "none";
+                if (display) {
+                    visibleRowCount++;
+                }
+            });
+            filteredRecordCountDisplay.textContent = `Mostrando ${visibleRowCount} de ${processedDataGlobal.length} registros`;
+        }
+        
+        // Function to download data as CSV
+        function downloadCSV(data) {
+            const csvRows = [];
+            const headers = [ "Cédula", "PHQ-9 Puntuación", "PHQ-9 Interpretación", "GAD-7 Puntuación", "GAD-7 Interpretación", "PSS-14 Puntuación", "PSS-14 Interpretación" ];
+            csvRows.push(headers.join(';'));
+
+            data.forEach(row => {
+                let phq9Text = row.phq9_interpretation + (row.phq9_warning ? " (¡Atención pregunta 9!)" : "");
+                const values = [ row.cedula, row.phq9_score, phq9Text, row.gad7_score, row.gad7_interpretation, row.pss14_score, row.pss14_interpretation ]
+                    .map(value => `"${String(value).replace(/"/g, '""')}"`); 
+                csvRows.push(values.join(';'));
+            });
+
+            const csvString = "\uFEFF" + csvRows.join('\r\n'); 
+            const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            if (link.download !== undefined) {
+                const url = URL.createObjectURL(blob);
+                link.setAttribute('href', url);
+                link.setAttribute('download', 'resultados_analisis.csv');
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+            } else {
+                showModal("La descarga directa de CSV no es compatible con tu navegador.");
+            }
+        }
+    </script>
+</body>
+</html>
