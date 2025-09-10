@@ -5,13 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Analizador de Cuestionarios de Salud Mental</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         body {
             font-family: 'Inter', sans-serif;
             background-color: #f0f4f8;
         }
         .container {
-            max-width: 1400px; /* Increased width for more columns */
+            max-width: 1400px;
             margin: 2rem auto;
             padding: 1.5rem;
             background-color: white;
@@ -56,9 +57,9 @@
         }
         th, td {
             border: 1px solid #e5e7eb;
-            padding: 0.65rem; /* Adjusted padding for more columns */
+            padding: 0.65rem;
             text-align: left;
-            font-size: 0.8rem; /* Slightly smaller font for more columns */
+            font-size: 0.8rem;
         }
         th {
             background-color: #e0e7ff;
@@ -71,7 +72,7 @@
             padding: 0.3rem 0.5rem; 
             border: 1px solid #d1d5db;
             border-radius: 4px;
-            font-size: 0.75rem; /* Smaller font for filters */
+            font-size: 0.75rem;
             margin-top: 0.25rem;
             box-sizing: border-box;
         }
@@ -136,13 +137,13 @@
     <div class="container">
         <header class="text-center mb-8">
             <h1 class="text-3xl font-bold mb-2">Analizador de Cuestionarios de Salud Mental</h1>
-            <p class="text-gray-600">Cargue un archivo CSV para procesar los resultados de Autoestima (RSES), PHQ-9, GAD-7 y PSS-14.</p>
+            <p class="text-gray-600">Cargue un archivo CSV o XLSX para procesar los resultados de Autoestima (RSES), PHQ-9, GAD-7 y PSS-14.</p>
         </header>
 
         <div class="mb-6">
             <label for="csvFileInput" class="file-input-label block">
-                <span id="file-name-display" class="text-gray-700">Haz clic aquí para seleccionar tu archivo CSV</span>
-                <input type="file" id="csvFileInput" class="hidden" accept=".csv">
+                <span id="file-name-display" class="text-gray-700">Haz clic aquí para seleccionar tu archivo CSV o XLSX</span>
+                <input type="file" id="csvFileInput" class="hidden" accept=".csv, .xlsx, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel">
             </label>
         </div>
 
@@ -217,12 +218,13 @@
 
         const scoreMapPHQGAD = {
             "ningun dia": 0, "no en absoluto": 0, "para nada": 0,
-            "varios dias": 1, "mas de la mitad de los dias": 2, "casi todos los dias": 3
+            "varios dias": 1, "mas de la mitad de los dias": 2, "casi todos los dias": 3,
+            "un poco dificil": 1, "algo dificil": 2, "muy dificil": 3
         };
         const scoreMapPSS = {
             "nunca": 0, "casi nunca": 1, "de vez en cuando": 2, "a menudo": 3, "muy a menudo": 4
         };
-         const scoreMapRSESDirect = {
+        const scoreMapRSESDirect = {
             "muy de acuerdo": 3, "de acuerdo": 2, "en desacuerdo": 1, "muy en desacuerdo": 0
         };
         const scoreMapRSESReverse = {
@@ -235,7 +237,7 @@
                 fileNameDisplay.textContent = `Archivo: ${event.target.files[0].name}`;
                 processButton.disabled = false;
             } else {
-                fileNameDisplay.textContent = 'Haz clic aquí para seleccionar tu archivo CSV';
+                fileNameDisplay.textContent = 'Haz clic aquí para seleccionar tu archivo CSV o XLSX';
                 processButton.disabled = true;
                 downloadCsvButton.disabled = true;
             }
@@ -254,7 +256,19 @@
                 const reader = new FileReader();
                 reader.onload = function(e) {
                     try {
-                        const csvText = e.target.result;
+                        let csvText = "";
+                        const fileExtension = file.name.split('.').pop().toLowerCase();
+
+                        if (fileExtension === 'xlsx') {
+                            const data = new Uint8Array(e.target.result);
+                            const workbook = XLSX.read(data, {type: 'array'});
+                            const firstSheetName = workbook.SheetNames[0];
+                            const worksheet = workbook.Sheets[firstSheetName];
+                            csvText = XLSX.utils.sheet_to_csv(worksheet, { FS: ',' });
+                        } else {
+                            csvText = e.target.result;
+                        }
+
                         processedDataGlobal = processCSV(csvText);
                         populateFilterDropdowns(processedDataGlobal);
                         displayResults(processedDataGlobal); 
@@ -263,20 +277,28 @@
                             downloadCsvButton.disabled = false;
                         }
                     } catch (error) {
-                        console.error("Error procesando CSV:", error);
+                        console.error("Error procesando archivo:", error);
                         showModal(`Error al procesar el archivo: ${error.message}`);
                     } finally {
                         loadingIndicator.classList.add('hidden');
                     }
                 };
+
                 reader.onerror = () => {
                     console.error("Error al leer archivo.");
                     showModal("Error al leer el archivo.");
                     loadingIndicator.classList.add('hidden');
                 };
-                reader.readAsText(file, 'ISO-8859-1'); 
+                
+                const fileExtension = file.name.split('.').pop().toLowerCase();
+                if (fileExtension === 'xlsx') {
+                    reader.readAsArrayBuffer(file);
+                } else {
+                    reader.readAsText(file, 'UTF-8'); 
+                }
+
             } else {
-                showModal("Por favor, selecciona un archivo CSV.");
+                showModal("Por favor, selecciona un archivo CSV o XLSX.");
             }
         });
 
@@ -305,33 +327,16 @@
         function normalizeAnswer(answer) {
             if (typeof answer !== 'string') return "";
             let processedAnswer = answer.replace(/\u00A0/g, ' '); 
-            processedAnswer = processedAnswer.trim();
-            processedAnswer = processedAnswer.toLowerCase();
+            processedAnswer = processedAnswer.trim().toLowerCase();
             processedAnswer = processedAnswer.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
             processedAnswer = processedAnswer.replace(/\s+/g, ' ').trim();
+            if (processedAnswer.startsWith('"') && processedAnswer.endsWith('"')) {
+                processedAnswer = processedAnswer.substring(1, processedAnswer.length - 1);
+            }
             return processedAnswer;
         }
 
         // Calculation Functions
-         function calculateRSES(answers) {
-            let score = 0;
-            const reverseScoredIndices = [5, 6, 7, 8, 9]; // Based on CSV structure: items [104] to [108]
-
-            answers.forEach((ans, index) => {
-                const normalizedAns = normalizeAnswer(ans);
-                if (reverseScoredIndices.includes(index)) {
-                    score += scoreMapRSESReverse[normalizedAns] || 0;
-                } else {
-                    score += scoreMapRSESDirect[normalizedAns] || 0;
-                }
-            });
-
-            let interpretation = "Autoestima alta";
-            if (score <= 15) interpretation = "Autoestima baja";
-            else if (score <= 25) interpretation = "Autoestima media";
-            return { score, rses_interpretation: interpretation };
-        }
-
         function calculatePHQ9(answers) {
             let score = 0; let warningQ9 = false;
             answers.forEach((ans, index) => {
@@ -356,12 +361,39 @@
             else if (score <= 14) interpretation = "Ansiedad moderada";
             return { score, gad7_interpretation: interpretation };
         }
+        
+        function calculateRSES_semantic(answers, headers) {
+            let score = 0;
+            const reverseScoredIDs = ['[113', '[114', '[115', '[116', '[117'];
 
-        function calculatePSS14(answers) {
-            let score = 0; const directItemsIndices = [0, 1, 2, 7, 10, 11, 13]; 
             answers.forEach((ans, index) => {
-                let questionScore = scoreMapPSS[normalizeAnswer(ans)] || 0;
-                if (!directItemsIndices.includes(index)) questionScore = 4 - questionScore;
+                const normalizedAns = normalizeAnswer(ans);
+                const currentHeader = headers[index];
+                const isReversed = reverseScoredIDs.some(id => currentHeader.includes(id));
+                if (isReversed) {
+                    score += scoreMapRSESReverse[normalizedAns] || 0;
+                } else {
+                    score += scoreMapRSESDirect[normalizedAns] || 0;
+                }
+            });
+            let interpretation = "Autoestima alta";
+            if (score <= 15) interpretation = "Autoestima baja";
+            else if (score <= 25) interpretation = "Autoestima media";
+            return { score, rses_interpretation: interpretation };
+        }
+        
+        function calculatePSS14_semantic(answers, headers) {
+            let score = 0;
+            const reverseScoredIDs = ['[139', '[140', '[141', '[142', '[144', '[145', '[148'];
+
+            answers.forEach((ans, index) => {
+                const normalizedAns = normalizeAnswer(ans);
+                const currentHeader = headers[index];
+                let questionScore = scoreMapPSS[normalizedAns] || 0;
+                const isReversed = reverseScoredIDs.some(id => currentHeader.includes(id));
+                if (isReversed) {
+                    questionScore = 4 - questionScore;
+                }
                 score += questionScore;
             });
             let interpretation = "Estrés elevado";
@@ -374,44 +406,64 @@
         function processCSV(csvText) {
             const lines = csvText.split(/\r\n|\n/).filter(line => line.trim() !== "");
             if (lines.length < 2) throw new Error("El archivo CSV está vacío o no tiene datos.");
-            const headers = lines[0].split(';').map(h => h.trim());
+            
+            const delimiter = ','; 
+            const headers = lines[0].split(delimiter).map(h => h.trim().replace(/^"|"$/g, ''));
             const data = [];
-            const requiredColumnCount = 43; 
-            if (headers.length < requiredColumnCount) {
-                 console.warn(`El archivo CSV tiene ${headers.length} columnas, se esperaban al menos ${requiredColumnCount}.`);
+
+            const cedulaIndex = headers.findIndex(h => h.toUpperCase().includes('CÉDULA'));
+            if (cedulaIndex === -1) {
+                throw new Error("No se pudo encontrar una columna con el nombre 'Cédula' en el archivo.");
             }
-            const cedulaIndex = headers.length - 1; 
-            const rses_indices = Array.from({length: 10}, (_, i) => i); // First 10 columns
-            const phq9_indices = Array.from({length: 9}, (_, i) => 10 + i);
-            const gad7_indices = Array.from({length: 7}, (_, i) => 20 + i);
-            const pss14_indices = Array.from({length: 14}, (_, i) => 28 + i);
+
+            const rses_cols = [], phq9_cols = [], gad7_cols = [], pss14_cols = [];
+            
+            // ** CORRECCIÓN: Lógica mejorada para identificar columnas GAD-7 **
+            const gad7QuestionIDs = ['[128', '[129', '[130', '[131', '[132', '[133', '[134'];
+
+            headers.forEach((header, index) => {
+                const upperHeader = header.toUpperCase();
+                const isGad7Question = gad7QuestionIDs.some(id => upperHeader.includes(id));
+
+                if (upperHeader.includes('AUTOESTIMA')) {
+                    rses_cols.push({ index, header });
+                } else if (upperHeader.includes('DEPRESIÓN')) {
+                    if (!upperHeader.includes('[127')) {
+                        phq9_cols.push({ index, header });
+                    }
+                } else if (upperHeader.includes('ANSIEDAD') || isGad7Question) {
+                    if (!upperHeader.includes('[135')) {
+                        gad7_cols.push({ index, header });
+                    }
+                } else if (upperHeader.includes('ESTRÉS')) {
+                    pss14_cols.push({ index, header });
+                }
+            });
 
             for (let i = 1; i < lines.length; i++) {
-                const currentLine = lines[i].split(';');
-                const cedula = (cedulaIndex < currentLine.length && currentLine[cedulaIndex]) ? currentLine[cedulaIndex].trim() : `FILA_${i+1}_SIN_ID`;
+                const currentLine = lines[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
+                const cedula = currentLine[cedulaIndex] ? currentLine[cedulaIndex].trim() : `FILA_${i+1}_SIN_ID`;
                 const getAnswer = (line, index) => (index < line.length && line[index] !== undefined ? line[index] : "");
+
+                const rses_answers = rses_cols.map(col => getAnswer(currentLine, col.index));
+                const phq9_answers = phq9_cols.map(col => getAnswer(currentLine, col.index));
+                const gad7_answers = gad7_cols.map(col => getAnswer(currentLine, col.index));
+                const pss14_answers = pss14_cols.map(col => getAnswer(currentLine, col.index));
                 
-                const rses_answers = rses_indices.map(idx => getAnswer(currentLine, idx));
-                const phq9_answers = phq9_indices.map(idx => getAnswer(currentLine, idx));
-                const gad7_answers = gad7_indices.map(idx => getAnswer(currentLine, idx));
-                const pss14_answers = pss14_indices.map(idx => getAnswer(currentLine, idx));
-                
-                const rses_result = calculateRSES(rses_answers);
+                const rses_headers = rses_cols.map(col => col.header);
+                const pss14_headers = pss14_cols.map(col => col.header);
+
+                const rses_result = calculateRSES_semantic(rses_answers, rses_headers);
                 const phq9_result = calculatePHQ9(phq9_answers);
                 const gad7_result = calculateGAD7(gad7_answers);
-                const pss14_result = calculatePSS14(pss14_answers);
-                
+                const pss14_result = calculatePSS14_semantic(pss14_answers, pss14_headers);
+
                 data.push({
-                    cedula, 
-                    rses_score: rses_result.score,
-                    rses_interpretation: rses_result.rses_interpretation,
-                    phq9_score: phq9_result.score, 
-                    phq9_interpretation: phq9_result.phq9_interpretation, 
-                    phq9_warning: phq9_result.phq9_warning,
-                    gad7_score: gad7_result.score, 
-                    gad7_interpretation: gad7_result.gad7_interpretation,
-                    pss14_score: pss14_result.score, 
-                    pss14_interpretation: pss14_result.pss14_interpretation
+                    cedula,
+                    rses_score: rses_result.score, rses_interpretation: rses_result.rses_interpretation,
+                    phq9_score: phq9_result.score, phq9_interpretation: phq9_result.phq9_interpretation, phq9_warning: phq9_result.phq9_warning,
+                    gad7_score: gad7_result.score, gad7_interpretation: gad7_result.gad7_interpretation,
+                    pss14_score: pss14_result.score, pss14_interpretation: pss14_result.pss14_interpretation
                 });
             }
             return data;
@@ -439,10 +491,9 @@
             });
 
             const populateSelect = (selectElement, optionsSet) => {
-                Array.from(selectElement.options).forEach(option => {
-                    if (option.value !== "") option.remove();
-                });
-                optionsSet.forEach(opt => {
+                selectElement.innerHTML = '<option value="">Todas</option>';
+                const sortedOptions = Array.from(optionsSet).sort();
+                sortedOptions.forEach(opt => {
                     const option = document.createElement('option');
                     option.value = opt;
                     option.textContent = opt;
@@ -455,10 +506,8 @@
             populateSelect(filterPss14Int, pss14Interpretations);
         }
 
-        // Display Results & Filtering
         function displayResults(data) {
             resultsTableBody.innerHTML = ''; 
-            
             if (data.length === 0) {
                 filteredRecordCountDisplay.textContent = "No se encontraron datos válidos para procesar.";
                 showModal("No se encontraron datos válidos para procesar o el archivo está vacío.");
@@ -492,10 +541,10 @@
                 let display = true;
                 const rowCedula = row.cells[0].textContent.toLowerCase();
                 const rowRsesInt = row.cells[2].textContent;
-                const rowPhq9IntFullText = row.cells[4].textContent; // Index adjusted
+                const rowPhq9IntFullText = row.cells[4].textContent;
                 const rowPhq9Int = rowPhq9IntFullText.includes(" (¡Atención pregunta 9!)") ? rowPhq9IntFullText.split(" (¡Atención pregunta 9!)")[0] : rowPhq9IntFullText;
-                const rowGad7Int = row.cells[6].textContent; // Index adjusted
-                const rowPss14Int = row.cells[8].textContent; // Index adjusted
+                const rowGad7Int = row.cells[6].textContent;
+                const rowPss14Int = row.cells[8].textContent;
 
                 if (cedulaFilter && !rowCedula.includes(cedulaFilter)) display = false;
                 if (rsesFilter && rowRsesInt !== rsesFilter) display = false;
@@ -511,7 +560,6 @@
             filteredRecordCountDisplay.textContent = `Mostrando ${visibleRowCount} de ${processedDataGlobal.length} registros`;
         }
         
-        // Function to download data as CSV
         function downloadCSV(data) {
             const csvRows = [];
             const headers = [ 
