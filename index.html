@@ -118,8 +118,8 @@
             border-radius: 8px;
             box-shadow: 0 5px 15px rgba(0,0,0,0.3);
             width: 95%;
-            max-width: 500px;
-            text-align: center;
+            max-width: 600px; 
+            text-align: left; 
             max-height: 90vh;
             overflow-y: auto;
         }
@@ -130,6 +130,9 @@
             border-radius: 6px;
             margin-top: 1.5rem;
             cursor: pointer;
+            display: block; 
+            margin-left: auto; 
+            margin-right: 0;
         }
     </style>
 </head>
@@ -187,7 +190,7 @@
     <!-- Modal for errors or messages -->
     <div id="messageModal" class="modal hidden">
         <div class="modal-content">
-            <p id="modalMessageText"></p>
+            <div id="modalMessageText"></div>
             <button id="modalCloseButton" class="modal-btn">Cerrar</button>
         </div>
     </div>
@@ -215,6 +218,7 @@
         const filterPss14Int = document.getElementById('filterPss14Int');
 
         let processedDataGlobal = []; 
+        let unrecognizedAnswers = new Set(); 
 
         const scoreMapPHQGAD = {
             "ningun dia": 0, "no en absoluto": 0, "para nada": 0,
@@ -252,6 +256,7 @@
                 filteredRecordCountDisplay.textContent = '';
                 downloadCsvButton.disabled = true;
                 resetFilters();
+                unrecognizedAnswers.clear(); 
 
                 const reader = new FileReader();
                 reader.onload = function(e) {
@@ -270,6 +275,19 @@
                         }
 
                         processedDataGlobal = processCSV(csvText);
+                        
+                        if (unrecognizedAnswers.size > 0) {
+                            let warningMessage = `<h3 class='font-bold text-lg mb-2 text-yellow-700'>Aviso de Diagnóstico</h3>`;
+                            warningMessage += `<p class='mb-3'>Se encontraron respuestas no reconocidas que podrían afectar los cálculos. Esto puede causar puntuaciones incorrectas (como 0 o 28).</p>`;
+                            warningMessage += `<p>Por favor, revise que los siguientes textos en su archivo coincidan con los esperados (ej. 'nunca', 'casi nunca', 'de acuerdo', etc.):</p>`;
+                            warningMessage += `<ul class='list-disc list-inside bg-gray-100 p-2 rounded mt-2 text-sm'>`;
+                            unrecognizedAnswers.forEach(ans => {
+                                warningMessage += `<li>"${ans}"</li>`;
+                            });
+                            warningMessage += `</ul>`;
+                            showModal(warningMessage, true);
+                        }
+
                         populateFilterDropdowns(processedDataGlobal);
                         displayResults(processedDataGlobal); 
                         resultsArea.classList.remove('hidden');
@@ -278,7 +296,7 @@
                         }
                     } catch (error) {
                         console.error("Error procesando archivo:", error);
-                        showModal(`Error al procesar el archivo: ${error.message}`);
+                        showModal(`<strong>Error al procesar el archivo:</strong> ${error.message}`);
                     } finally {
                         loadingIndicator.classList.add('hidden');
                     }
@@ -286,7 +304,7 @@
 
                 reader.onerror = () => {
                     console.error("Error al leer archivo.");
-                    showModal("Error al leer el archivo.");
+                    showModal("<strong>Error al leer el archivo.</strong>");
                     loadingIndicator.classList.add('hidden');
                 };
                 
@@ -298,20 +316,12 @@
                 }
 
             } else {
-                showModal("Por favor, selecciona un archivo CSV o XLSX.");
+                showModal("<strong>Por favor, selecciona un archivo CSV o XLSX.</strong>");
             }
         });
 
         modalCloseButton.addEventListener('click', () => messageModal.classList.add('hidden'));
-        
-        downloadCsvButton.addEventListener('click', () => {
-            if (processedDataGlobal.length > 0) {
-                downloadCSV(processedDataGlobal);
-            } else {
-                showModal("No hay datos procesados para descargar.");
-            }
-        });
-
+        downloadCsvButton.addEventListener('click', () => downloadCSV(processedDataGlobal));
         filterCedula.addEventListener('keyup', applyTableFilters);
         filterRsesInt.addEventListener('change', applyTableFilters);
         filterPhq9Int.addEventListener('change', applyTableFilters);
@@ -319,62 +329,68 @@
         filterPss14Int.addEventListener('change', applyTableFilters);
 
         // Utility Functions
-        function showModal(message) {
-            modalMessageText.textContent = message;
+        function showModal(message, isHtml = false) {
+            if (isHtml) {
+                modalMessageText.innerHTML = message;
+            } else {
+                modalMessageText.textContent = message;
+            }
             messageModal.classList.remove('hidden');
         }
 
         function normalizeAnswer(answer) {
             if (typeof answer !== 'string') return "";
-            let processedAnswer = answer.replace(/\u00A0/g, ' '); 
-            processedAnswer = processedAnswer.trim().toLowerCase();
-            processedAnswer = processedAnswer.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-            processedAnswer = processedAnswer.replace(/\s+/g, ' ').trim();
-            if (processedAnswer.startsWith('"') && processedAnswer.endsWith('"')) {
-                processedAnswer = processedAnswer.substring(1, processedAnswer.length - 1);
-            }
-            return processedAnswer;
+            return answer.replace(/\u00A0/g, ' ').trim()
+                         .toLowerCase()
+                         .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+                         .replace(/\s+/g, ' ')
+                         .replace(/^"|"$/g, '');
         }
 
-        // Calculation Functions
+        function getScore(originalAnswer, scoreMap) {
+            const normalizedAns = normalizeAnswer(originalAnswer);
+            if (scoreMap.hasOwnProperty(normalizedAns)) {
+                return scoreMap[normalizedAns];
+            } else if (originalAnswer && originalAnswer.trim() !== "") {
+                unrecognizedAnswers.add(originalAnswer.trim());
+            }
+            return 0;
+        }
+        
         function calculatePHQ9(answers) {
-            let score = 0; let warningQ9 = false;
+            let score = 0;
+            let warningQ9 = false;
             answers.forEach((ans, index) => {
-                const questionScore = scoreMapPHQGAD[normalizeAnswer(ans)] || 0;
+                const questionScore = getScore(ans, scoreMapPHQGAD);
                 score += questionScore;
                 if (index === 8 && questionScore > 0) warningQ9 = true;
             });
-            let interpretation = "Depresión grave";
+            let interpretation = "";
             if (score <= 4) interpretation = "Depresión mínima o ausente";
             else if (score <= 9) interpretation = "Depresión leve";
             else if (score <= 14) interpretation = "Depresión moderada";
             else if (score <= 19) interpretation = "Depresión moderadamente grave";
+            else if (score >= 20) interpretation = "Depresión grave";
             return { score, phq9_interpretation: interpretation, phq9_warning: warningQ9 };
         }
 
         function calculateGAD7(answers) {
             let score = 0;
-            answers.forEach(ans => { score += scoreMapPHQGAD[normalizeAnswer(ans)] || 0; });
-            let interpretation = "Ansiedad grave";
+            answers.forEach(ans => { score += getScore(ans, scoreMapPHQGAD); });
+            let interpretation = "";
             if (score <= 4) interpretation = "Ansiedad mínima";
             else if (score <= 9) interpretation = "Ansiedad leve";
             else if (score <= 14) interpretation = "Ansiedad moderada";
+            else if (score >= 15) interpretation = "Ansiedad grave";
             return { score, gad7_interpretation: interpretation };
         }
         
         function calculateRSES_semantic(answers, headers) {
             let score = 0;
             const reverseScoredIDs = ['[113', '[114', '[115', '[116', '[117'];
-
             answers.forEach((ans, index) => {
-                const normalizedAns = normalizeAnswer(ans);
-                const currentHeader = headers[index];
-                const isReversed = reverseScoredIDs.some(id => currentHeader.includes(id));
-                if (isReversed) {
-                    score += scoreMapRSESReverse[normalizedAns] || 0;
-                } else {
-                    score += scoreMapRSESDirect[normalizedAns] || 0;
-                }
+                const isReversed = reverseScoredIDs.some(id => headers[index].includes(id));
+                score += getScore(ans, isReversed ? scoreMapRSESReverse : scoreMapRSESDirect);
             });
             let interpretation = "Autoestima alta";
             if (score <= 15) interpretation = "Autoestima baja";
@@ -385,12 +401,9 @@
         function calculatePSS14_semantic(answers, headers) {
             let score = 0;
             const reverseScoredIDs = ['[139', '[140', '[141', '[142', '[144', '[145', '[148'];
-
             answers.forEach((ans, index) => {
-                const normalizedAns = normalizeAnswer(ans);
-                const currentHeader = headers[index];
-                let questionScore = scoreMapPSS[normalizedAns] || 0;
-                const isReversed = reverseScoredIDs.some(id => currentHeader.includes(id));
+                let questionScore = getScore(ans, scoreMapPSS);
+                const isReversed = reverseScoredIDs.some(id => headers[index].includes(id));
                 if (isReversed) {
                     questionScore = 4 - questionScore;
                 }
@@ -402,38 +415,39 @@
             return { score, pss14_interpretation: interpretation };
         }
 
-        // CSV Processing
         function processCSV(csvText) {
             const lines = csvText.split(/\r\n|\n/).filter(line => line.trim() !== "");
             if (lines.length < 2) throw new Error("El archivo CSV está vacío o no tiene datos.");
             
-            const delimiter = ','; 
-            const headers = lines[0].split(delimiter).map(h => h.trim().replace(/^"|"$/g, ''));
+            const headers = lines[0].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(h => h.trim().replace(/^"|"$/g, ''));
             const data = [];
 
-            const cedulaIndex = headers.findIndex(h => h.toUpperCase().includes('CÉDULA'));
+            // **FIX**: Normalize header text to safely find 'cedula' without accents.
+            const cedulaIndex = headers.findIndex(h => 
+                h.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().includes('CEDULA')
+            );
+
             if (cedulaIndex === -1) {
                 throw new Error("No se pudo encontrar una columna con el nombre 'Cédula' en el archivo.");
             }
 
             const rses_cols = [], phq9_cols = [], gad7_cols = [], pss14_cols = [];
             
-            // ** CORRECCIÓN: Lógica mejorada para identificar columnas GAD-7 **
             const gad7QuestionIDs = ['[128', '[129', '[130', '[131', '[132', '[133', '[134'];
 
             headers.forEach((header, index) => {
                 const upperHeader = header.toUpperCase();
                 const isGad7Question = gad7QuestionIDs.some(id => upperHeader.includes(id));
 
-                if (upperHeader.includes('AUTOESTIMA')) {
+                if (isGad7Question) {
+                    if (!upperHeader.includes('[135')) { 
+                        gad7_cols.push({ index, header });
+                    }
+                } else if (upperHeader.includes('AUTOESTIMA')) {
                     rses_cols.push({ index, header });
                 } else if (upperHeader.includes('DEPRESIÓN')) {
                     if (!upperHeader.includes('[127')) {
                         phq9_cols.push({ index, header });
-                    }
-                } else if (upperHeader.includes('ANSIEDAD') || isGad7Question) {
-                    if (!upperHeader.includes('[135')) {
-                        gad7_cols.push({ index, header });
                     }
                 } else if (upperHeader.includes('ESTRÉS')) {
                     pss14_cols.push({ index, header });
@@ -442,6 +456,8 @@
 
             for (let i = 1; i < lines.length; i++) {
                 const currentLine = lines[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
+                if (currentLine.length <= cedulaIndex) continue; 
+                
                 const cedula = currentLine[cedulaIndex] ? currentLine[cedulaIndex].trim() : `FILA_${i+1}_SIN_ID`;
                 const getAnswer = (line, index) => (index < line.length && line[index] !== undefined ? line[index] : "");
 
@@ -471,48 +487,37 @@
         
         function resetFilters() {
             filterCedula.value = "";
-            filterRsesInt.innerHTML = '<option value="">Todas</option>';
-            filterPhq9Int.innerHTML = '<option value="">Todas</option>';
-            filterGad7Int.innerHTML = '<option value="">Todas</option>';
-            filterPss14Int.innerHTML = '<option value="">Todas</option>';
+            ['filterRsesInt', 'filterPhq9Int', 'filterGad7Int', 'filterPss14Int'].forEach(id => {
+                document.getElementById(id).innerHTML = '<option value="">Todas</option>';
+            });
         }
 
         function populateFilterDropdowns(data) {
-            const rsesInterpretations = new Set();
-            const phq9Interpretations = new Set();
-            const gad7Interpretations = new Set();
-            const pss14Interpretations = new Set();
-
+            const interpretations = { rses: new Set(), phq9: new Set(), gad7: new Set(), pss14: new Set() };
             data.forEach(row => {
-                rsesInterpretations.add(row.rses_interpretation);
-                phq9Interpretations.add(row.phq9_interpretation);
-                gad7Interpretations.add(row.gad7_interpretation);
-                pss14Interpretations.add(row.pss14_interpretation);
+                interpretations.rses.add(row.rses_interpretation);
+                interpretations.phq9.add(row.phq9_interpretation);
+                interpretations.gad7.add(row.gad7_interpretation);
+                interpretations.pss14.add(row.pss14_interpretation);
             });
-
-            const populateSelect = (selectElement, optionsSet) => {
-                selectElement.innerHTML = '<option value="">Todas</option>';
-                const sortedOptions = Array.from(optionsSet).sort();
-                sortedOptions.forEach(opt => {
-                    const option = document.createElement('option');
-                    option.value = opt;
-                    option.textContent = opt;
-                    selectElement.appendChild(option);
-                });
+            const populateSelect = (select, optionsSet) => {
+                select.innerHTML = '<option value="">Todas</option>';
+                Array.from(optionsSet).sort().forEach(opt => select.add(new Option(opt, opt)));
             };
-            populateSelect(filterRsesInt, rsesInterpretations);
-            populateSelect(filterPhq9Int, phq9Interpretations);
-            populateSelect(filterGad7Int, gad7Interpretations);
-            populateSelect(filterPss14Int, pss14Interpretations);
+            populateSelect(filterRsesInt, interpretations.rses);
+            populateSelect(filterPhq9Int, interpretations.phq9);
+            populateSelect(filterGad7Int, interpretations.gad7);
+            populateSelect(filterPss14Int, interpretations.pss14);
         }
 
         function displayResults(data) {
             resultsTableBody.innerHTML = ''; 
-            if (data.length === 0) {
+            if (data.length === 0 && unrecognizedAnswers.size === 0) {
                 filteredRecordCountDisplay.textContent = "No se encontraron datos válidos para procesar.";
-                showModal("No se encontraron datos válidos para procesar o el archivo está vacío.");
+                showModal("<strong>No se encontraron datos válidos para procesar.</strong> Verifique que el archivo no esté vacío y tenga el formato correcto.");
                 return;
             }
+            const fragment = document.createDocumentFragment();
             data.forEach(row => {
                 const tr = document.createElement('tr');
                 let phq9Text = row.phq9_interpretation + (row.phq9_warning ? " (¡Atención pregunta 9!)" : "");
@@ -524,80 +529,58 @@
                     <td>${row.gad7_score}</td> <td>${row.gad7_interpretation}</td>
                     <td>${row.pss14_score}</td> <td>${row.pss14_interpretation}</td>
                 `;
-                resultsTableBody.appendChild(tr);
+                fragment.appendChild(tr);
             });
+            resultsTableBody.appendChild(fragment);
             applyTableFilters();
         }
 
         function applyTableFilters() {
-            const cedulaFilter = filterCedula.value.toLowerCase().trim();
-            const rsesFilter = filterRsesInt.value;
-            const phq9Filter = filterPhq9Int.value;
-            const gad7Filter = filterGad7Int.value;
-            const pss14Filter = filterPss14Int.value;
+            const filters = {
+                cedula: filterCedula.value.toLowerCase().trim(),
+                rses: filterRsesInt.value,
+                phq9: filterPhq9Int.value,
+                gad7: filterGad7Int.value,
+                pss14: filterPss14Int.value
+            };
             let visibleRowCount = 0;
-
-            Array.from(resultsTableBody.rows).forEach(row => {
-                let display = true;
-                const rowCedula = row.cells[0].textContent.toLowerCase();
-                const rowRsesInt = row.cells[2].textContent;
-                const rowPhq9IntFullText = row.cells[4].textContent;
-                const rowPhq9Int = rowPhq9IntFullText.includes(" (¡Atención pregunta 9!)") ? rowPhq9IntFullText.split(" (¡Atención pregunta 9!)")[0] : rowPhq9IntFullText;
-                const rowGad7Int = row.cells[6].textContent;
-                const rowPss14Int = row.cells[8].textContent;
-
-                if (cedulaFilter && !rowCedula.includes(cedulaFilter)) display = false;
-                if (rsesFilter && rowRsesInt !== rsesFilter) display = false;
-                if (phq9Filter && rowPhq9Int !== phq9Filter) display = false;
-                if (gad7Filter && rowGad7Int !== gad7Filter) display = false;
-                if (pss14Filter && rowPss14Int !== pss14Filter) display = false;
+            resultsTableBody.querySelectorAll('tr').forEach(row => {
+                const cells = row.cells;
+                const rowPhq9Int = cells[4].textContent.split(" (¡Atención pregunta 9!)")[0];
                 
-                row.style.display = display ? "" : "none";
-                if (display) {
-                    visibleRowCount++;
-                }
+                const isVisible = (!filters.cedula || cells[0].textContent.toLowerCase().includes(filters.cedula)) &&
+                                  (!filters.rses || cells[2].textContent === filters.rses) &&
+                                  (!filters.phq9 || rowPhq9Int === filters.phq9) &&
+                                  (!filters.gad7 || cells[6].textContent === filters.gad7) &&
+                                  (!filters.pss14 || cells[8].textContent === filters.pss14);
+                
+                row.style.display = isVisible ? "" : "none";
+                if (isVisible) visibleRowCount++;
             });
             filteredRecordCountDisplay.textContent = `Mostrando ${visibleRowCount} de ${processedDataGlobal.length} registros`;
         }
         
         function downloadCSV(data) {
-            const csvRows = [];
-            const headers = [ 
-                "Cédula", 
-                "Autoestima Puntuación", "Autoestima Interpretación",
-                "PHQ-9 Puntuación", "PHQ-9 Interpretación", 
-                "GAD-7 Puntuación", "GAD-7 Interpretación", 
-                "PSS-14 Puntuación", "PSS-14 Interpretación" 
-            ];
-            csvRows.push(headers.join(';'));
-
+            if (data.length === 0) {
+                showModal("<strong>No hay datos para descargar.</strong>");
+                return;
+            }
+            const headers = ["Cédula", "Autoestima Puntuación", "Autoestima Interpretación", "PHQ-9 Puntuación", "PHQ-9 Interpretación", "GAD-7 Puntuación", "GAD-7 Interpretación", "PSS-14 Puntuación", "PSS-14 Interpretación"];
+            const csvRows = [headers.join(';')];
             data.forEach(row => {
                 let phq9Text = row.phq9_interpretation + (row.phq9_warning ? " (¡Atención pregunta 9!)" : "");
-                const values = [ 
-                    row.cedula, 
-                    row.rses_score, row.rses_interpretation,
-                    row.phq9_score, phq9Text, 
-                    row.gad7_score, row.gad7_interpretation, 
-                    row.pss14_score, row.pss14_interpretation 
-                ].map(value => `"${String(value).replace(/"/g, '""')}"`); 
-                csvRows.push(values.join(';'));
+                const values = [row.cedula, row.rses_score, row.rses_interpretation, row.phq9_score, phq9Text, row.gad7_score, row.gad7_interpretation, row.pss14_score, row.pss14_interpretation];
+                csvRows.push(values.map(v => `"${String(v).replace(/"/g, '""')}"`).join(';'));
             });
-
-            const csvString = "\uFEFF" + csvRows.join('\r\n'); 
+            const csvString = "\uFEFF" + csvRows.join('\r\n');
             const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement('a');
-            if (link.download !== undefined) {
-                const url = URL.createObjectURL(blob);
-                link.setAttribute('href', url);
-                link.setAttribute('download', 'resultados_analisis_completos.csv');
-                link.style.visibility = 'hidden';
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                URL.revokeObjectURL(url);
-            } else {
-                showModal("La descarga directa de CSV no es compatible con tu navegador.");
-            }
+            link.href = URL.createObjectURL(blob);
+            link.download = 'resultados_analisis_completos.csv';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(link.href);
         }
     </script>
 </body>
