@@ -1,85 +1,105 @@
-# Analizador de Encuestas de Salud Mental
+# 🧠 Analizador y Generador de Reportes de Encuestas de Salud Mental
 
-## Descripción
+Bienvenido a una **suite web integral** para el análisis, visualización y reportería de resultados de los cuestionarios psicométricos más utilizados en salud mental: **RSES, PHQ-9, GAD-7 y PSS-14**.
 
-Esta es una aplicación web del lado del cliente diseñada para procesar y analizar los resultados de cuatro cuestionarios psicométricos comunes utilizados en la evaluación de la salud mental:
+---
 
-* **RSES:** Escala de Autoestima de Rosenberg (para la autoestima global).
-* **PHQ-9:** Cuestionario sobre la Salud del Paciente-9 (para la depresión).
-* **GAD-7:** Trastorno de Ansiedad Generalizada-7 (para la ansiedad).
-* **PSS-14:** Escala de Estrés Percibido (14 ítems).
+## 🚀 ¿Qué hace esta aplicación?
 
-La herramienta permite a los usuarios cargar un archivo CSV que contiene las respuestas de los encuestados, calcula automáticamente las puntuaciones para cada cuestionario, proporciona interpretaciones basadas en las escalas estandarizadas, y permite filtrar y descargar los resultados procesados.
+- **Carga, procesa y analiza** datos brutos de encuestas (.xlsx o .csv).
+- **Calcula e interpreta** automáticamente las puntuaciones de cada cuestionario.
+- **Visualiza** los resultados en gráficos interactivos.
+- **Exporta** los reportes en PDF o CSV, listos para compartir o analizar.
 
-## Funcionalidades Clave
+---
 
-* **Carga de Archivos CSV:** Permite seleccionar y cargar archivos `.csv` que contienen las respuestas de las encuestas.
-* **Procesamiento Automático:**
-    * Calcula las puntuaciones totales para RSES, PHQ-9, GAD-7 y PSS-14.
-    * Interpreta las puntuaciones para determinar el nivel de severidad/categoría (p. ej., "Autoestima media", "Depresión leve", "Ansiedad moderada", "Estrés elevado").
-* **Advertencias Específicas (PHQ-9):** Identifica y resalta si un encuestado ha respondido afirmativamente a la pregunta 9 del PHQ-9 (relacionada con pensamientos de autolesión).
-* **Visualización Tabular:** Muestra los resultados procesados en una tabla clara y organizada.
-* **Filtrado Dinámico:**
-    * Permite filtrar los resultados por **Cédula** (búsqueda de texto libre).
-    * Permite filtrar por **Interpretación de RSES** (usando un menú desplegable).
-    * Permite filtrar por **Interpretación del PHQ-9** (menú desplegable).
-    * Permite filtrar por **Interpretación del GAD-7** (menú desplegable).
-    * Permite filtrar por **Interpretación del PSS-14** (menú desplegable).
-* **Conteo de Registros:** Muestra el número total de registros procesados y cuántos son visibles después de aplicar filtros.
-* **Descarga de Resultados:** Permite descargar la tabla completa de resultados procesados en un nuevo archivo CSV.
+## 🗂️ Cuestionarios Soportados
 
-## Cómo Usar
+- **RSES:** Escala de Autoestima de Rosenberg
+- **PHQ-9:** Cuestionario sobre la Salud del Paciente-9 (Depresión)
+- **GAD-7:** Trastorno de Ansiedad Generalizada-7 (Ansiedad)
+- **PSS-14:** Escala de Estrés Percibido (14 ítems)
 
-1.  **Descargar/Clonar:** Obtén el archivo HTML principal del repositorio.
-2.  **Abrir en Navegador:** Abre el archivo HTML directamente en un navegador web moderno.
-3.  **Seleccionar Archivo:** Haz clic en el área designada para "seleccionar tu archivo CSV".
-4.  **Procesar:** Una vez seleccionado el archivo, el botón "Procesar Archivo" se habilitará. Haz clic en él.
-5.  **Ver Resultados:** Los resultados calculados e interpretados aparecerán en una tabla.
-6.  **Filtrar (Opcional):**
-    * Escribe en el campo debajo de "Cédula" para filtrar por identificador.
-    * Selecciona una categoría en los menús desplegables de las columnas de "Interpretación" para filtrar por esos criterios.
-    * El contador de registros se actualizará.
-7.  **Descargar (Opcional):** Haz clic en "Descargar CSV" para guardar los datos procesados.
+---
 
-## Formato del Archivo CSV de Entrada
+## 🏄‍♂️ Flujo de Trabajo Sencillo
 
-* **Delimitador:** Punto y coma (`;`).
-* **Encabezados:** La primera fila debe ser de encabezados.
-* **Codificación:** La aplicación lee el archivo con codificación `ISO-8859-1` (latin1).
-* **Estructura de Columnas Esperada:**
-    * **RSES (Autoestima):** Primeras 10 columnas de respuestas (índices 0-9 del CSV).
-    * **PHQ-9 (Depresión):** Siguientes 9 columnas de respuestas (índices 10-18 del CSV).
-    * **GAD-7 (Ansiedad):** Siguientes 7 columnas de respuestas (índices 20-26 del CSV, asumiendo que hay columnas intermedias para preguntas de funcionalidad del PHQ-9 que no se usan en el cálculo de score).
-    * **PSS-14 (Estrés):** Siguientes 14 columnas de respuestas (índices 28-41 del CSV, asumiendo una columna intermedia para funcionalidad del GAD-7).
-    * **Cédula:** Se espera en la última columna del archivo.
-    * *(Nota: Las columnas de "funcionalidad" de PHQ-9 y GAD-7, si existen entre los bloques de preguntas principales, son omitidas para el cálculo de los scores principales, pero deben estar presentes para que los índices de las preguntas de los tests subsiguientes sean correctos).*
+1. **Analiza tus datos**  
+   Abre `index.html` en tu navegador, carga tu archivo de encuesta y obtén una tabla interactiva con los resultados y diagnósticos automáticos.
 
-## Cuestionarios y Escalas Utilizadas
+2. **Visualiza y reporta**  
+   Haz clic en "Generar Reporte Gráfico" para abrir `report.html` y ver histogramas, resúmenes y opciones de descarga en PDF o CSV.
 
-* **RSES (Autoestima de Rosenberg):**
-    * 10 ítems. Respuestas ("Muy de acuerdo", "De acuerdo", "En desacuerdo", "Muy en desacuerdo") puntuadas de 0-3.
-    * Ítems directos (preguntas 1-5 del bloque de autoestima en el CSV): Muy de acuerdo=3, ..., Muy en desacuerdo=0.
-    * Ítems inversos (preguntas 6-10 del bloque de autoestima en el CSV): Muy de acuerdo=0, ..., Muy en desacuerdo=3.
-    * Interpretación: 0-15 (Baja), 16-25 (Media), 26-30 (Alta).
-* **PHQ-9 (Depresión):**
-    * Respuestas: "No en absoluto" (0), "Varios días" (1), "Más de la mitad de los días" (2), "Casi todos los días" (3).
-    * Interpretación: 0-4 (Mínima/Ausente), 5-9 (Leve), 10-14 (Moderada), 15-19 (Moderadamente Grave), 20-27 (Grave).
-* **GAD-7 (Ansiedad):**
-    * Respuestas: "Para nada" (0), "Varios días" (1), "Más de la mitad de los días" (2), "Casi todos los días" (3).
-    * Interpretación: 0-4 (Mínima), 5-9 (Leve), 10-14 (Moderada), 15-21 (Grave).
-* **PSS-14 (Estrés Percibido):**
-    * Respuestas: "Nunca" (0/4), "Casi nunca" (1/3), "De vez en cuando" (2/2), "A menudo" (3/1), "Muy a menudo" (4/0). Puntuación invertida para ítems 4, 5, 6, 7, 9, 10, 13 (contando desde 1 dentro del bloque PSS-14).
-    * Interpretación: Puntuación total 0-56. 0-19 (Bajo), 20-25 (Moderado), >25 (Elevado).
+---
 
-## Tecnologías Utilizadas
+## ✨ Funcionalidades Destacadas
 
-* HTML5
-* CSS3 (con [Tailwind CSS](https://tailwindcss.com/))
-* JavaScript (Vanilla JS)
+### 1. Analizador de Cuestionarios (`index.html`)
+- **Carga flexible:** Acepta archivos `.xlsx` y `.csv`.
+- **Identificación inteligente:** Detecta preguntas y cédula por palabras clave y códigos, sin importar el orden de las columnas.
+- **Procesamiento automático:** Calcula e interpreta puntuaciones de los cuatro cuestionarios.
+- **Diagnóstico de datos:** Advierte sobre respuestas no reconocidas o inconsistentes.
+- **Alerta PHQ-9:** Resalta respuestas afirmativas sobre autolesión.
+- **Filtrado dinámico:** Filtra resultados por cédula o interpretación.
+- **Integración directa:** Un clic para enviar datos al generador de reportes.
 
-## Contribuciones
+### 2. Generador de Reportes (`report.html`)
+- **Recepción automática:** Recibe datos del analizador o permite carga manual de CSV procesado.
+- **Visualización gráfica:** Histogramas claros para cada cuestionario.
+- **Resumen cuantitativo:** Muestra el total de participantes.
+- **Exportación fácil:** Descarga reportes en PDF visual o datos en CSV.
 
-Las sugerencias y contribuciones son bienvenidas. Por favor, abre un *issue* para discutir cambios mayores o reportar errores.
+---
 
-## Licencia
+## 📥 ¿Cómo usar la aplicación?
 
+1. **Abre** `index.html` en tu navegador.
+2. **Selecciona** tu archivo de encuesta (.xlsx o .csv).
+3. **Procesa** los datos y explora la tabla interactiva.
+4. *(Opcional)* **Filtra** por cédula o interpretación.
+5. **Genera el reporte gráfico** (abre `report.html` automáticamente).
+6. **Descarga** el informe en PDF o los datos en CSV.
+
+---
+
+## 📑 Formato de Entrada
+
+- **Formato:** `.xlsx` o `.csv`
+- **Encabezados:** La primera fila debe contener los nombres de las columnas.
+- **Identificadores:**  
+  - Palabras clave en encabezados para agrupar preguntas (ej. "AUTOESTIMA", "DEPRESIÓN", "ESTRÉS").
+  - Para GAD-7, busca códigos únicos (ej. `[128]`, `[129]`, etc.).
+  - La columna de identificación debe contener "Cédula" (con o sin tilde, mayúsculas o minúsculas).
+- **Respuestas:** El texto debe ser consistente (ej. "nunca", "casi nunca", "de acuerdo"). El sistema te avisará si detecta inconsistencias.
+
+---
+
+## 🛠️ Tecnologías Utilizadas
+
+- **HTML5**
+- **CSS3** (Tailwind CSS)
+- **JavaScript** (Vanilla JS)
+- **PapaParse:** Análisis de CSV en el navegador
+- **SheetJS (XLSX):** Lectura de archivos Excel
+- **Chart.js:** Gráficos interactivos
+- **jsPDF & html2canvas:** Exportación de reportes en PDF
+
+---
+
+## 📸 Vista previa
+
+> *(Agrega aquí capturas de pantalla si lo deseas)*
+
+---
+
+## 🤝 Contribuciones
+
+¿Tienes ideas o mejoras? ¡Las contribuciones son bienvenidas!
+
+---
+
+## 📄 Licencia
+
+MIT
+
+---

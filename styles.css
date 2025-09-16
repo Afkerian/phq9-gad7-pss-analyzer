@@ -1,0 +1,128 @@
+body {
+    font-family: 'Inter', sans-serif;
+    background-color: #f0f4f8;
+}
+.container {
+    max-width: 1400px;
+    margin: 2rem auto;
+    padding: 1.5rem;
+    background-color: white;
+    border-radius: 12px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+}
+h1, h2 {
+    color: #1e3a8a;
+}
+.btn {
+    background-color: #2563eb;
+    color: white;
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    font-weight: 500;
+    transition: background-color 0.3s ease;
+    cursor: pointer;
+}
+.btn:hover {
+    background-color: #1d4ed8;
+}
+.btn:disabled {
+    background-color: #9ca3af;
+    cursor: not-allowed;
+}
+.file-input-label {
+    border: 2px dashed #93c5fd;
+    padding: 2rem;
+    text-align: center;
+    border-radius: 8px;
+    cursor: pointer;
+    background-color: #eff6ff;
+    transition: background-color 0.3s ease;
+}
+.file-input-label:hover {
+    background-color: #dbeafe;
+}
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1.5rem;
+}
+th, td {
+    border: 1px solid #e5e7eb;
+    padding: 0.65rem;
+    text-align: left;
+    font-size: 0.8rem;
+}
+th {
+    background-color: #e0e7ff;
+    color: #1e3a8a;
+    font-weight: 600;
+    vertical-align: top; 
+}
+.filter-input, .filter-select {
+    width: 100%;
+    padding: 0.3rem 0.5rem; 
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    margin-top: 0.25rem;
+    box-sizing: border-box;
+}
+tbody tr:nth-child(even) {
+    background-color: #f9fafb;
+}
+tbody tr:hover {
+    background-color: #f3f4f6;
+}
+.results-table-container {
+    max-height: 500px;
+    overflow-y: auto;
+    border-radius: 8px;
+    border: 1px solid #e5e7eb;
+}
+.sticky-header th {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background-color: #e0e7ff;
+}
+.warning {
+    color: #b91c1c;
+    font-weight: bold;
+}
+.modal {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 1rem;
+    box-sizing: border-box;
+}
+.modal-content {
+    background-color: white;
+    padding: 2rem;
+    border-radius: 8px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+    width: 95%;
+    max-width: 600px; 
+    text-align: left; 
+    max-height: 90vh;
+    overflow-y: auto;
+}
+.modal-btn {
+    background-color: #2563eb;
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    margin-top: 1.5rem;
+    cursor: pointer;
+    display: block; 
+    margin-left: auto; 
+    margin-right: 0;
+}
+

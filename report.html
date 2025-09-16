@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generador de Reportes con Gráficos</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f0f4f8; }
+        .container { max-width: 1200px; margin: 2rem auto; padding: 1.5rem; background-color: white; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+        h1, h2, h3 { color: #1e3a8a; }
+        .btn { background-color: #2563eb; color: white; padding: 0.75rem 1.5rem; border-radius: 8px; font-weight: 500; transition: background-color 0.3s ease; cursor: pointer; }
+        .btn:hover { background-color: #1d4ed8; }
+        .btn:disabled { background-color: #9ca3af; cursor: not-allowed; }
+        .file-input-label { border: 2px dashed #93c5fd; padding: 2rem; text-align: center; border-radius: 8px; cursor: pointer; background-color: #eff6ff; transition: background-color 0.3s ease; }
+        .file-input-label:hover { background-color: #dbeafe; }
+        .chart-container { background-color: #f9fafb; border-radius: 8px; padding: 1rem; margin-top: 1rem; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="text-center mb-8">
+            <h1 class="text-3xl font-bold mb-2">Reporte Gráfico de Resultados</h1>
+            <p id="subtitle" class="text-gray-600">Cargue el archivo CSV generado por el analizador para crear los histogramas y el reporte en PDF.</p>
+        </header>
+
+        <div id="file-upload-section" class="mb-6">
+            <label for="csvReportInput" class="file-input-label block">
+                <span id="file-name-display" class="text-gray-700">Haz clic para seleccionar el archivo CSV de resultados</span>
+                <input type="file" id="csvReportInput" class="hidden" accept=".csv">
+            </label>
+        </div>
+
+        <div id="download-buttons" class="text-center mb-6 hidden space-x-4">
+            <button id="downloadPdfButton" class="btn">Descargar Reporte en PDF</button>
+            <button id="downloadCsvButton" class="btn bg-green-600 hover:bg-green-700">Descargar Datos en CSV</button>
+        </div>
+
+        <div id="reportArea" class="hidden space-y-8">
+            <div id="summarySection">
+                <h2 class="text-2xl font-semibold mb-2">Resumen General</h2>
+                <p>Total de participantes analizados: <span id="totalParticipants" class="font-bold"></span></p>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div class="chart-container">
+                    <h3 class="text-xl font-semibold mb-2 text-center">Autoestima (RSES)</h3>
+                    <canvas id="rsesChart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <h3 class="text-xl font-semibold mb-2 text-center">Depresión (PHQ-9)</h3>
+                    <canvas id="phq9Chart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <h3 class="text-xl font-semibold mb-2 text-center">Ansiedad (GAD-7)</h3>
+                    <canvas id="gad7Chart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <h3 class="text-xl font-semibold mb-2 text-center">Estrés Percibido (PSS-14)</h3>
+                    <canvas id="pss14Chart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const csvReportInput = document.getElementById('csvReportInput');
+        const fileNameDisplay = document.getElementById('file-name-display');
+        const downloadPdfButton = document.getElementById('downloadPdfButton');
+        const downloadCsvButton = document.getElementById('downloadCsvButton');
+        const downloadButtons = document.getElementById('download-buttons');
+        const fileUploadSection = document.getElementById('file-upload-section');
+        const subtitle = document.getElementById('subtitle');
+        const reportArea = document.getElementById('reportArea');
+        const totalParticipants = document.getElementById('totalParticipants');
+        let processedReportData = [];
+        let charts = {};
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const storedData = sessionStorage.getItem('surveyReportData');
+            if (storedData) {
+                try {
+                    processedReportData = JSON.parse(storedData);
+                    sessionStorage.removeItem('surveyReportData'); // Clean up after use
+                    displayReport(processedReportData);
+                    
+                    // Update UI to reflect that data is loaded
+                    fileUploadSection.classList.add('hidden');
+                    subtitle.textContent = "Datos cargados desde el analizador.";
+                } catch (e) {
+                    console.error("Error parsing data from sessionStorage:", e);
+                    subtitle.textContent = "Error al cargar datos. Por favor, suba un archivo CSV.";
+                }
+            }
+        });
+
+
+        csvReportInput.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            fileNameDisplay.textContent = `Archivo: ${file.name}`;
+            
+            Papa.parse(file, {
+                header: true,
+                delimiter: ";",
+                skipEmptyLines: true,
+                complete: (results) => {
+                    processedReportData = results.data;
+                    displayReport(processedReportData);
+                },
+                error: (err) => {
+                    console.error("Error parsing CSV:", err);
+                    alert("No se pudo leer el archivo CSV. Asegúrese que use ';' como delimitador.");
+                }
+            });
+        });
+
+        function countInterpretations(data) {
+            const counts = { rses: {}, phq9: {}, gad7: {}, pss14: {} };
+            data.forEach(row => {
+                const rsesInt = row["Autoestima Interpretación"];
+                const phq9Int = row["PHQ-9 Interpretación"] ? row["PHQ-9 Interpretación"].split(" (")[0] : undefined; // Remove warning
+                const gad7Int = row["GAD-7 Interpretación"];
+                const pss14Int = row["PSS-14 Interpretación"];
+
+                if(rsesInt) counts.rses[rsesInt] = (counts.rses[rsesInt] || 0) + 1;
+                if(phq9Int) counts.phq9[phq9Int] = (counts.phq9[phq9Int] || 0) + 1;
+                if(gad7Int) counts.gad7[gad7Int] = (counts.gad7[gad7Int] || 0) + 1;
+                if(pss14Int) counts.pss14[pss14Int] = (counts.pss14[pss14Int] || 0) + 1;
+            });
+            return counts;
+        }
+
+        function createChart(canvasId, data) {
+            const ctx = document.getElementById(canvasId).getContext('2d');
+            const labels = Object.keys(data);
+            const values = Object.values(data);
+            
+            if (charts[canvasId]) charts[canvasId].destroy();
+
+            charts[canvasId] = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Número de Participantes',
+                        data: values,
+                        backgroundColor: 'rgba(37, 99, 235, 0.6)',
+                        borderColor: 'rgba(37, 99, 235, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } },
+                    plugins: { legend: { display: false } }
+                }
+            });
+        }
+
+        function displayReport(data) {
+            if (!data || data.length === 0) {
+                alert("No hay datos válidos para mostrar en el reporte.");
+                return;
+            }
+            const counts = countInterpretations(data);
+            totalParticipants.textContent = data.length;
+
+            createChart('rsesChart', counts.rses);
+            createChart('phq9Chart', counts.phq9);
+            createChart('gad7Chart', counts.gad7);
+            createChart('pss14Chart', counts.pss14);
+
+            reportArea.classList.remove('hidden');
+            downloadButtons.classList.remove('hidden');
+        }
+        
+        downloadPdfButton.addEventListener('click', () => {
+            const { jsPDF } = window.jspdf;
+            const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
+            const reportElement = document.getElementById('reportArea');
+            reportElement.style.backgroundColor = 'white';
+
+            html2canvas(reportElement, { scale: 2, useCORS: true, backgroundColor: '#ffffff' })
+                .then(canvas => {
+                    reportElement.style.backgroundColor = ''; // Restore original style
+                    const imgData = canvas.toDataURL('image/png');
+                    const pdfWidth = pdf.internal.pageSize.getWidth();
+                    const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+                    
+                    pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+                    pdf.save('reporte_de_resultados.pdf');
+                });
+        });
+
+        downloadCsvButton.addEventListener('click', () => {
+            if (processedReportData.length === 0) {
+                alert("No hay datos para descargar.");
+                return;
+            }
+            const csv = Papa.unparse(processedReportData, { delimiter: ";" });
+            const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'reporte_datos_completos.csv';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        });
+
+    </script>
+</body>
+</html>
+
